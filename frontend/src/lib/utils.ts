@@ -33,6 +33,34 @@ export function getCursorSVG(fill: string, size: number) {
   // Use encodeURIComponent to safely escape any special characters (#, <, >) in the SVG code
   return `url("data:image/svg+xml;utf8,${encodeURIComponent(svgString)}") ${hotspot} ${hotspot}, auto`;
 }
+type playerData = {
+  sid: string;
+  brushType: "Spray" | "Pencil" | "Dotted" | "Circular";
+  brushWidth: number;
+  brushColor: Colord;
+};
+
+export function initBrush(canvas: Canvas, data: playerData) {
+  let brush: SprayPaintBrush | PencilBrush | SprayBrush | CircleBrush;
+
+  if (data.brushType == "Spray") {
+    brush = new SprayPaintBrush(canvas);
+    brush.loadBrush().then(() => {
+      (brush as SprayPaintBrush).setColor(data.brushColor.toHex());
+    });
+  } else {
+    if (data.brushType == "Circular") {
+      brush = new CircleBrush(canvas);
+    } else if (data.brushType == "Dotted") {
+      brush = new SprayBrush(canvas);
+    } else if (data.brushType == "Pencil") {
+      brush = new PencilBrush(canvas);
+    }
+    brush!.color = data.brushColor.toRgbString();
+    brush!.width = data.brushWidth;
+  }
+  return brush!;
+}
 
 export function handleBrush(
   canvas: Canvas,
@@ -40,7 +68,6 @@ export function handleBrush(
   brushWidth: number,
   color: Colord,
 ) {
-  console.log("run");
   let currentPaintBrush:
     | SprayPaintBrush
     | PencilBrush
@@ -54,28 +81,36 @@ export function handleBrush(
       canvas.freeDrawingBrush = currentPaintBrush;
       // canvas.freeDrawingBrush.width = brushWidth;
     });
-    console.log("Spray");
+    // console.log("Spray");
   } else {
     if (brushType == "Circular") {
       currentPaintBrush = new CircleBrush(canvas);
       canvas.freeDrawingBrush = currentPaintBrush;
       // canvas.freeDrawingBrush.width = brushWidth;
-      console.log("Circle");
+      // console.log("Circle");
     } else if (brushType == "Dotted") {
       currentPaintBrush = new SprayBrush(canvas);
       canvas.freeDrawingBrush = currentPaintBrush;
       // canvas.freeDrawingBrush.width = brushWidth;
-      console.log("Dotted");
+      // console.log("Dotted");
     } else if (brushType == "Pencil") {
       currentPaintBrush = new PencilBrush(canvas);
       canvas.freeDrawingBrush = currentPaintBrush;
       // canvas.freeDrawingBrush.width = brushWidth;
-      console.log("Pencil");
+      // console.log("Pencil");
     }
   }
   canvas.freeDrawingBrush!.color = color.toRgbString();
   canvas.freeDrawingBrush!.width = brushWidth;
   canvas.freeDrawingCursor = getCursorSVG(color.toRgbString(), brushWidth);
+}
+
+export async function loadCanvas(canvas: Canvas, data: any) {
+  await canvas.loadFromJSON(data, () => {
+    console.log("loaded");
+    canvas.requestRenderAll();
+  });
+  console.log("done");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

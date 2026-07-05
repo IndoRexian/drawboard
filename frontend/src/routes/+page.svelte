@@ -1,17 +1,28 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { Canvas } from "fabric";
+  import {
+    Canvas,
+    CircleBrush,
+    Path,
+    PencilBrush,
+    Point,
+    SprayBrush,
+    type TBrushEventData,
+  } from "fabric";
 
-  import { colord, type Colord, type RgbaColor } from "colord";
+  import { Colord, colord, type RgbaColor } from "colord";
   import ColorPicker from "svelte-awesome-color-picker";
-  import { Circle, Pipette, Wallpaper } from "@lucide/svelte";
+  import { Circle, Pipette, Wallpaper, X } from "@lucide/svelte";
 
   import { Slider } from "$lib/components/ui/slider/index.js";
   import { Separator } from "$lib/components/ui/separator/index.js";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
 
-  import { getCursorSVG, handleBrush } from "$lib/utils";
+  import { getCursorSVG, handleBrush, initBrush, loadCanvas } from "$lib/utils";
+  import { io, Socket } from "socket.io-client";
+  import { goto } from "$app/navigation";
+  import type { SprayPaintBrush } from "$lib/canvas";
 
   let canvasElement: HTMLCanvasElement;
   let canvas: Canvas;
@@ -30,6 +41,25 @@
 
   let brushWidth: number = $state(1);
 
+  let socket: Socket;
+  let room_code: string = $state("");
+
+  let ifMouseDown: boolean = $state(false);
+
+  type playerData = {
+    sid: string;
+    brushType: "Spray" | "Pencil" | "Dotted" | "Circular";
+    brushWidth: number;
+    brushColor: Colord;
+  };
+  let players: Array<playerData> = $state([]);
+
+  type playerBrush = {
+    sid: string;
+    brush: SprayPaintBrush | PencilBrush | SprayBrush | CircleBrush;
+  };
+  let playerBrushes: Array<playerBrush> = $state([]);
+
   onMount(() => {
     canvas = new Canvas(canvasElement, {
       width: 600,
@@ -38,18 +68,173 @@
       freeDrawingCursor: getCursorSVG(color.toRgbString(), brushWidth),
       isDrawingMode: true,
     });
-  });
-  $effect(() => {
-    if (!canvas) return;
-    canvas.on("mouse:over", () => {
-      canvas.renderAll();
+    socket = io("http://127.0.0.1:8000/", {
+      transports: ["websocket", "webtransport", "polling"],
+      rejectUnauthorized: false,
     });
   });
+
   $effect(() => {
-    console.log(strPaintBrush);
+    socket.on("connect", () => {
+      if (url.searchParams.get("room_code") == null) {
+        //Creator of room
+        console.log("Asking for a room");
+        socket.emit("get_roomcode"); //asking for room_code
+      } else {
+        room_code = url.searchParams.get("room_code")!;
+        socket.emit("join_room", room_code);
+        console.log("Joined Room");
+      }
+      socket.emit("send_data", room_code);
+      console.log("Connected from Frontend");
+    });
+    const url = new URL(window.location.toString());
+
+    socket.on("send_roomcode", (data) => {
+      //getting room_code
+      room_code = data["room_code"];
+      console.log(room_code);
+      goto(`/?room_code=${room_code}`);
+    });
+    socket.on("user_join", (data) => {
+      const player: playerData = {
+        sid: data["sid"],
+        brushType: "Pencil",
+        brushWidth: 3,
+        brushColor: colord({ r: 0, g: 0, b: 0, a: 1 }),
+      };
+      players.push(player);
+      const playerBrush: playerBrush = {
+        sid: data["sid"],
+        brush: initBrush(canvas, player),
+      };
+      //this is basically the current users sending their brush configs to the new user
+      socket.emit("draw:brush_change", room_code, {
+        brushType: strPaintBrush,
+        brushColor: color.toHex(),
+        brushWidth: brushWidth,
+      });
+      playerBrushes.push(playerBrush);
+    });
+
+    socket.on("draw:started", (data) => {
+      console.log(playerBrushes);
+      const newPoint = new Point();
+      newPoint.setXY(data.data.x, data.data.y);
+      const brush = playerBrushes.find((value) => value.sid === data.sid);
+      console.log(brush);
+      brush?.brush.onMouseDown(newPoint, {
+        e: {},
+      } as TBrushEventData);
+      canvas.requestRenderAll();
+    });
+    socket.on("draw:conted", (data) => {
+      const newPoint = new Point();
+      newPoint.setXY(data.data.x, data.data.y);
+      const brush = playerBrushes.find(
+        (value) => value.sid === data.sid,
+      )?.brush;
+      brush?.onMouseMove(newPoint, {
+        e: {},
+      } as TBrushEventData);
+
+      console.log(data);
+    });
+    socket.on("draw:ended", (data) => {
+      const brush = playerBrushes.find(
+        (value) => value.sid === data.sid,
+      )?.brush;
+      brush?.onMouseUp({
+        e: {},
+      } as TBrushEventData);
+
+      console.log(data);
+    });
+
+    socket.on("exit_room", (data: { sid: string }) => {
+      players = players.filter((value) => {
+        value.sid !== data.sid;
+      });
+    });
+    socket.on("draw:brush_changed", (data) => {
+      console.log("change found!");
+      const playerIndex = players.findIndex((value) => value.sid === data.sid);
+      const playerBrushIndex = playerBrushes.findIndex(
+        (value) => value.sid === data.sid,
+      );
+
+      const player: playerData = {
+        sid: data.sid,
+        brushType: data.data.brushType,
+        brushColor: colord(data.data.brushColor),
+        brushWidth: data.data.brushWidth,
+      };
+
+      const playerBrush: playerBrush = {
+        sid: data.sid,
+        brush: initBrush(canvas, player),
+      };
+      if (playerIndex !== -1) {
+        players[playerIndex] = player;
+        playerBrushes[playerBrushIndex] = playerBrush;
+      } else {
+        players.push(player);
+        playerBrushes.push(playerBrush);
+      }
+    });
+    if (!canvas) return;
+
+    canvas.on("mouse:down", (e) => {
+      ifMouseDown = true;
+      const point = canvas.getScenePoint(e.e);
+      const data = {
+        x: point.x,
+        y: point.y,
+        type: strPaintBrush,
+        color: color.toHex(),
+        width: brushWidth,
+      };
+      socket.emit("draw:start", room_code, data);
+    });
+    canvas.on("mouse:up", (e) => {
+      ifMouseDown = false;
+
+      const point = canvas.getScenePoint(e.e);
+      const data = {
+        x: point.x,
+        y: point.y,
+        type: strPaintBrush,
+        color: color.toHex(),
+        width: brushWidth,
+      };
+      socket.emit("draw:end", room_code, data);
+    });
+    canvas.on("mouse:move", (e) => {
+      if (!ifMouseDown) return;
+
+      const point = canvas.getScenePoint(e.e);
+      const data = {
+        x: point.x,
+        y: point.y,
+        type: strPaintBrush,
+        color: color.toHex(),
+        width: brushWidth,
+      };
+      socket.emit("draw:cont", room_code, data);
+    });
+
+    return () => socket.disconnect();
+  });
+  $effect(() => {
     canvas.backgroundColor = bg_color.toRgbString();
     const cursorSVG = getCursorSVG(color.toRgbString(), brushWidth);
     const hexString = color.toHex();
+
+    socket.emit("draw:brush_change", room_code, {
+      brushType: strPaintBrush,
+      brushColor: color.toHex(),
+      brushWidth: brushWidth,
+    });
     handleBrush(canvas, strPaintBrush, brushWidth, color);
     if (!canvas || !canvas.freeDrawingBrush) return;
     canvas.requestRenderAll();
