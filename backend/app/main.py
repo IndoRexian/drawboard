@@ -35,12 +35,12 @@ async def home():
 
 @sio.event
 async def connect(sid: str, environ: dict, auth):
-    """
-    Parameters
-    -----------
-    sid : str
-        Session ID
+    """Triggered when the user connects.
 
+    Parameters
+    ----------
+    sid : str
+        The SID of the user who left the room.
     """
 
     print(f"Connected '{sid}' to Webserver")
@@ -48,12 +48,12 @@ async def connect(sid: str, environ: dict, auth):
 
 @sio.on("get_roomcode")
 async def get_roomcode(sid: str):
-    """Emits the roomcode to the user
+    """Emits the roomcode to the user.
 
     Parameters
     ----------
     sid : str
-        User SID
+        The SID of the user.
     """
 
     room_code = str(uuid.uuid4())
@@ -63,6 +63,15 @@ async def get_roomcode(sid: str):
 
 @sio.on("join_room")
 async def join_room(sid: str, room_code: str):
+    """Allows the user to join the room whose `room_code` has been provided.
+
+    Parameters
+    ----------
+    sid : str
+        The SID of the user.
+    room_code : str
+        The UUID Room Code.
+    """
     print(room_code)
     with open("./data/temp.json", "r") as f:
         json_data: dict = json.load(f)
@@ -75,6 +84,7 @@ async def join_room(sid: str, room_code: str):
     await sio.emit("user_join", {"sid": sid}, skip_sid=sid)
 
 
+# Old Methods
 @sio.on("send_data")
 async def send_data(sid: str, room_code: str):
     with open("./data/temp.json", "rt") as f:
@@ -95,8 +105,27 @@ async def recieve_data(sid: str, room_code: str, data: str):
     await sio.emit("get_data", json_data, room=room_code, skip_sid=sid)
 
 
+# New Methods
 @sio.on("draw:start")
 async def start_draw(sid: str, room_code: str, data: str):
+    """Triggers when the user has just started drawing.
+
+    Parameters
+    ----------
+    sid : str
+        The SID of the user.
+    room_code : str
+        The UUID Room Code.
+    data : str
+        Stringified version of this
+        {
+        x: float,
+        y: float,
+        type: str,
+        color: str,
+        width: int
+        }
+    """
     edited_data = {"sid": sid, "data": data}
     await sio.emit(
         "draw:started",
@@ -108,12 +137,48 @@ async def start_draw(sid: str, room_code: str, data: str):
 
 @sio.on("draw:cont")
 async def draw_cont(sid: str, room_code: str, data: str):
+    """Triggers when the user is drawing.
+
+    Parameters
+    ----------
+    sid : str
+        The SID of the user.
+    room_code : str
+        The UUID Room Code.
+    data : str
+        Stringified version of this
+        {
+        x: float,
+        y: float,
+        type: str,
+        color: str,
+        width: int
+        }
+    """
     edited_data = {"sid": sid, "data": data}
     await sio.emit("draw:conted", room=room_code, skip_sid=sid, data=edited_data)
 
 
 @sio.on("draw:end")
 async def draw_end(sid: str, room_code: str, data: str):
+    """Triggers when the user lifts their mouse after drawing. This data is obsolute for the most part however.
+
+    Parameters
+    ----------
+    sid : str
+        The SID of the user.
+    room_code : str
+        The UUID Room Code.
+    data : str
+        Stringified version of this
+        {
+        x: float,
+        y: float,
+        type: str,
+        color: str,
+        width: int
+        }
+    """
     edited_data = {"sid": sid, "data": data}
     await sio.emit(
         "draw:ended",
@@ -125,16 +190,21 @@ async def draw_end(sid: str, room_code: str, data: str):
 
 @sio.on("draw:brush_change")
 async def brush_change(sid: str, room_code: str, data: str):
-    """_summary_
+    """Triggers when anyone changes any property of their brush.
 
     Parameters
     ----------
     sid : str
-        _description_
+        The SID of the user.
     room_code : str
-        _description_
+        The UUID Room Code.
     data : str
-        _description_
+        Stringified version of this
+        {
+        brushType: str,
+        brushColor: str,
+        brushWidth: int
+        }
     """
     edited_data = {"sid": sid, "data": data}
     await sio.emit("draw:brush_changed", room=room_code, skip_sid=sid, data=edited_data)
@@ -142,6 +212,13 @@ async def brush_change(sid: str, room_code: str, data: str):
 
 @sio.event
 async def disconnect(sid: str):
+    """Triggered when the user disconnects. Also emits `exit_room` to let the other users know.
+
+    Parameters
+    ----------
+    sid : str
+        The SID of the user who left the room.
+    """
     print("this", sio.manager.get_rooms(sid, "/"))
     await sio.emit("exit_room", {"sid": sid}, room=sio.manager.get_rooms(sid, "/")[-1])
     print(f"Disconnected '{sid}' from Webserver")
