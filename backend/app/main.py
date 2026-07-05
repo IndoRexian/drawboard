@@ -220,5 +220,6 @@ async def disconnect(sid: str):
         The SID of the user who left the room.
     """
     print("this", sio.manager.get_rooms(sid, "/"))
-    await sio.emit("exit_room", {"sid": sid}, room=sio.manager.get_rooms(sid, "/")[-1])
+    target_room = [room for room in sio.manager.get_rooms(sid, "/") if room != sid][0]
+    await sio.emit("user_leave", {"sid": sid}, room=target_room)
     print(f"Disconnected '{sid}' from Webserver")

@@ -1,6 +1,7 @@
 <script lang="ts">
   import favicon from "$lib/assets/favicon.svg";
   import "../app.css";
+  import { Toaster } from "$lib/components/ui/sonner/index.js";
   let { children } = $props();
 </script>
 

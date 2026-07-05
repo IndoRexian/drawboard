@@ -3,7 +3,6 @@
   import {
     Canvas,
     CircleBrush,
-    Path,
     PencilBrush,
     Point,
     SprayBrush,
@@ -12,7 +11,13 @@
 
   import { Colord, colord, type RgbaColor } from "colord";
   import ColorPicker from "svelte-awesome-color-picker";
-  import { Circle, Pipette, Wallpaper, X } from "@lucide/svelte";
+  import {
+    Circle,
+    Pipette,
+    Wallpaper,
+    CircleUserRound,
+    LogOut,
+  } from "@lucide/svelte";
 
   import { Slider } from "$lib/components/ui/slider/index.js";
   import { Separator } from "$lib/components/ui/separator/index.js";
@@ -23,6 +28,7 @@
   import { io, Socket } from "socket.io-client";
   import { goto } from "$app/navigation";
   import type { SprayPaintBrush } from "$lib/canvas";
+  import { toast, Toaster } from "svelte-sonner";
 
   let canvasElement: HTMLCanvasElement;
   let canvas: Canvas;
@@ -108,6 +114,14 @@
         sid: data["sid"],
         brush: initBrush(canvas, player),
       };
+      toast("New User Joined", {
+        classes: {
+          toast: "!border-2 !border-green-500",
+        },
+        description: `SID: ${data["sid"]}`,
+        icon: CircleUserRound,
+        position: "top-right",
+      });
       //this is basically the current users sending their brush configs to the new user
       socket.emit("draw:brush_change", room_code, {
         brushType: strPaintBrush,
@@ -116,7 +130,18 @@
       });
       playerBrushes.push(playerBrush);
     });
-
+    socket.on("user_leave", (data) => {
+      console.log("LEFT");
+      players = players.filter((value) => value.sid !== data["sid"]);
+      toast("User Left!", {
+        classes: {
+          toast: "!border-2 !border-red-500",
+        },
+        description: `SID: ${data["sid"]}`,
+        icon: LogOut,
+        position: "top-right",
+      });
+    });
     socket.on("draw:started", (data) => {
       console.log(playerBrushes);
       const newPoint = new Point();
@@ -151,11 +176,6 @@
       console.log(data);
     });
 
-    socket.on("exit_room", (data: { sid: string }) => {
-      players = players.filter((value) => {
-        value.sid !== data.sid;
-      });
-    });
     socket.on("draw:brush_changed", (data) => {
       console.log("change found!");
       const playerIndex = players.findIndex((value) => value.sid === data.sid);
@@ -244,8 +264,10 @@
 </script>
 
 <div class="grid justify-center animate-in ease-in">
+  <Toaster />
   <div class="flex flex-fill text-2xl justify-center mb-1">Drawboard</div>
   <canvas bind:this={canvasElement} class="mb-1 border-2 border-black"></canvas>
+
   <div class="buttons flex flex-row gap-2.5 pt-1 pb-1">
     <!--BG Selection Button-->
     <button
