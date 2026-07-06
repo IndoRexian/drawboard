@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { Canvas } from "fabric";
 
   import { Colord, colord } from "colord";
@@ -29,6 +29,7 @@
     rgb: { r: 0, g: 0, b: 0, a: 1 },
     bg_rgb: { r: 255, g: 255, b: 255, a: 1 },
     brushWidth: 1,
+    lastUsedBg: "",
   });
   let color: Colord = $derived(colord(brushState.rgb));
   let bg_color: Colord = $derived(colord(brushState.bg_rgb));
@@ -52,7 +53,7 @@
 
   $effect(() => {
     lobbyController(socket, canvas, roomState, brushState);
-    drawingController(socket, canvas, roomState);
+    drawingController(socket, canvas, roomState, brushState);
 
     if (!canvas) return;
     canvasController(canvas, socket, roomState, brushState);
@@ -98,8 +99,6 @@
     return () => socket.disconnect();
   });
   $effect(() => {
-    canvas.backgroundColor = bg_color.toRgbString();
-
     socket.emit("draw:brush_change", roomState.room_code, {
       brushType: brushState.strPaintBrush,
       brushColor: color.toHex(),
@@ -107,6 +106,17 @@
     });
     handleBrush(canvas, brushState.strPaintBrush, brushState.brushWidth, color);
     if (!canvas || !canvas.freeDrawingBrush) return;
+    canvas.requestRenderAll();
+  });
+  $effect(() => {
+    if (!canvas || !socket) return;
+
+    canvas.backgroundColor = bg_color.toRgbString();
+    const data = {
+      bg_color: bg_color.rgba,
+    };
+
+    socket.emit("draw:bg_change", roomState.room_code, data);
     canvas.requestRenderAll();
   });
   //bind accepts only HTML Elements,

@@ -210,6 +210,23 @@ async def brush_change(sid: str, room_code: str, data: str):
     await sio.emit("draw:brush_changed", room=room_code, skip_sid=sid, data=edited_data)
 
 
+@sio.on("draw:bg_change")
+async def bg_change(sid: str, room_code: str, data: str):
+    """_summary_
+
+    Parameters
+    ----------
+    sid : str
+        _description_
+    room_code : str
+        _description_
+    data : str
+        _description_
+    """
+    edited_data = {"sid": sid, "data": data}
+    await sio.emit("draw:bg_changed", room=room_code, skip_sid=sid, data=edited_data)
+
+
 @sio.event
 async def disconnect(sid: str):
     """Triggered when the user disconnects. Also emits `exit_room` to let the other users know.

@@ -26,4 +26,5 @@ export type brushStateType = {
   rgb: RgbaColor;
   bg_rgb: RgbaColor;
   brushWidth: number;
+  lastUsedBg: string;
 };

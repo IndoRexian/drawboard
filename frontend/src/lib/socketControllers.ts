@@ -92,6 +92,7 @@ export function drawingController(
   socket: Socket,
   canvas: Canvas,
   roomState: roomStateType,
+  brushState: brushStateType,
 ) {
   socket.on("draw:started", (data) => {
     console.log(roomState.playerBrushes);
@@ -132,7 +133,7 @@ export function drawingController(
   });
 
   socket.on("draw:brush_changed", (data) => {
-    console.log("change found!");
+    console.log("Brush change found!");
     const playerIndex = roomState.players.findIndex(
       (value) => value.sid === data.sid,
     );
@@ -158,5 +159,15 @@ export function drawingController(
       roomState.players.push(player);
       roomState.playerBrushes.push(playerBrush);
     }
+  });
+
+  socket.on("draw:bg_changed", (data) => {
+    const bg_color = colord(data.data.bg_color);
+    if (bg_color.toRgbString() === brushState.lastUsedBg) return; //js to make sure changing bg doesnt loop
+    brushState.lastUsedBg = bg_color.toRgbString();
+    console.log(bg_color); //already comes as rgb string
+    canvas.backgroundColor = bg_color.toRgbString();
+    brushState.bg_rgb = bg_color.rgba;
+    canvas.requestRenderAll();
   });
 }
