@@ -1,23 +1,8 @@
-import { onMount } from "svelte";
-import {
-  Canvas,
-  CircleBrush,
-  PencilBrush,
-  Point,
-  SprayBrush,
-  type TBrushEventData,
-} from "fabric";
+import { CircleBrush, PencilBrush, SprayBrush } from "fabric";
 
-import { Colord, colord, type RgbaColor } from "colord";
-import { CircleUserRound, LogOut } from "@lucide/svelte";
+import { Colord, type RgbaColor } from "colord";
 
-import { getCursorSVG, handleBrush, initBrush } from "$lib/utils";
-import { io, Socket } from "socket.io-client";
-import { goto } from "$app/navigation";
 import type { SprayPaintBrush } from "$lib/canvas";
-import { toast, Toaster } from "svelte-sonner";
-import Toolbar from "$lib/components/Toolbar.svelte";
-import { drawingController, lobbyController } from "$lib/socketControllers";
 
 export type playerData = {
   sid: string;
