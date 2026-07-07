@@ -41,6 +41,11 @@ export function lobbyController(
     goto(`/?room_code=${roomState.room_code}`);
   });
 
+  socket.on("get_data", (data) => {
+    canvas.loadFromJSON(data);
+    canvas.requestRenderAll();
+  });
+
   socket.on("user_join", (data) => {
     const player: playerData = {
       sid: data["sid"],
@@ -128,7 +133,7 @@ export function drawingController(
     brush?.onMouseUp({
       e: {},
     } as TBrushEventData);
-
+    canvas.fire("objectAdded:recieved");
     console.log(data);
   });
 

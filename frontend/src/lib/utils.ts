@@ -95,13 +95,16 @@ export function handleBrush(
       // console.log("Dotted");
     } else if (brushType == "Pencil") {
       currentPaintBrush = new PencilBrush(canvas);
+      currentPaintBrush.decimate = 2.5;
       canvas.freeDrawingBrush = currentPaintBrush;
+
       // canvas.freeDrawingBrush.width = brushWidth;
       // console.log("Pencil");
     }
   }
   canvas.freeDrawingBrush!.color = color.toRgbString();
   canvas.freeDrawingBrush!.width = brushWidth;
+  //canvas.freeDrawingBrush
   canvas.freeDrawingCursor = getCursorSVG(color.toRgbString(), brushWidth);
 }
 

@@ -45,6 +45,7 @@
       ),
       isDrawingMode: true,
     });
+
     socket = io("http://127.0.0.1:8000/", {
       transports: ["websocket", "webtransport", "polling"],
       rejectUnauthorized: false,
@@ -114,6 +115,7 @@
     canvas.backgroundColor = bg_color.toRgbString();
     const data = {
       bg_color: bg_color.rgba,
+      bg_color_rgb: bg_color.toRgbString(),
     };
 
     socket.emit("draw:bg_change", roomState.room_code, data);

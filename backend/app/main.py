@@ -72,11 +72,13 @@ async def join_room(sid: str, room_code: str):
     room_code : str
         The UUID Room Code.
     """
-    print(room_code)
+    new_user = True
+    pre_data = {"version": "7.4.0", "objects": [], "background": "rgb(255, 255, 255)"}
     with open("./data/temp.json", "r") as f:
         json_data: dict = json.load(f)
-
-        json_data[room_code] = {}
+        if room_code not in json_data.keys():
+            json_data[room_code] = pre_data
+            new_user = False
 
     with open("./data/temp.json", "w") as f:
         json.dump(json_data, f, indent=4)
@@ -89,7 +91,7 @@ async def join_room(sid: str, room_code: str):
 async def send_data(sid: str, room_code: str):
     with open("./data/temp.json", "rt") as f:
         json_data: dict = json.load(f)
-    await sio.emit("get_data", json_data, room=room_code)
+    await sio.emit("get_data", json_data[room_code], room=room_code)
 
 
 @sio.on("recieve_data")
@@ -98,11 +100,10 @@ async def recieve_data(sid: str, room_code: str, data: str):
     with open("./data/temp.json", "r") as f:
         json_data: dict = json.load(f)
 
-        json_data[room_code] = json.loads(data)
+        json_data[room_code]["objects"].append(data)
 
     with open("./data/temp.json", "w") as f:
         json.dump(json_data, f, indent=4)
-    await sio.emit("get_data", json_data, room=room_code, skip_sid=sid)
 
 
 # New Methods
@@ -223,8 +224,17 @@ async def bg_change(sid: str, room_code: str, data: str):
     data : str
         _description_
     """
-    edited_data = {"sid": sid, "data": data}
-    await sio.emit("draw:bg_changed", room=room_code, skip_sid=sid, data=edited_data)
+    if room_code is not "":
+        with open("./data/temp.json", "r") as f:
+            json_data: dict = json.load(f)
+
+            json_data[room_code]["background"] = data["bg_color_rgb"]
+        with open("./data/temp.json", "w") as f:
+            json.dump(json_data, f, indent=4)
+        edited_data = {"sid": sid, "data": data}
+        await sio.emit(
+            "draw:bg_changed", room=room_code, skip_sid=sid, data=edited_data
+        )
 
 
 @sio.event
@@ -236,7 +246,7 @@ async def disconnect(sid: str):
     sid : str
         The SID of the user who left the room.
     """
-    print("this", sio.manager.get_rooms(sid, "/"))
+
     target_room = [room for room in sio.manager.get_rooms(sid, "/") if room != sid][0]
     await sio.emit("user_leave", {"sid": sid}, room=target_room)
     print(f"Disconnected '{sid}' from Webserver")
