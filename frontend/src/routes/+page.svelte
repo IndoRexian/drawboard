@@ -46,7 +46,7 @@
       isDrawingMode: true,
     });
 
-    socket = io("http://127.0.0.1:8000/", {
+    socket = io("/", {
       transports: ["websocket", "webtransport", "polling"],
       rejectUnauthorized: false,
     });
