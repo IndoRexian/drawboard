@@ -14,6 +14,7 @@ origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
+    "https://francesca-overpopulous-nonbrutally.ngrok-free.dev",
 ]
 
 app.add_middleware(
@@ -55,10 +56,23 @@ async def get_roomcode(sid: str):
     sid : str
         The SID of the user.
     """
-
+    new_user = True
+    pre_data = {
+        "players": [sid],
+        "data": {"version": "7.4.0", "objects": [], "background": "rgb(255, 255, 255)"},
+    }
     room_code = str(uuid.uuid4())
+    with open("./data/temp.json", "r") as f:
+        json_data: dict = json.load(f)
+        if room_code not in json_data.keys():
+            print("Creating New Room")
+            json_data[room_code] = pre_data
+            new_user = False
+
+    with open("./data/temp.json", "w") as f:
+        json.dump(json_data, f, indent=4)
     await sio.enter_room(sid, room_code)
-    await sio.emit("send_roomcode", {"room_code": room_code}, to=sid)
+    await sio.emit("send_roomcode", {"room_code": room_code, "sid": sid}, to=sid)
 
 
 @sio.on("join_room")
@@ -72,17 +86,13 @@ async def join_room(sid: str, room_code: str):
     room_code : str
         The UUID Room Code.
     """
-    new_user = True
-    pre_data = {"version": "7.4.0", "objects": [], "background": "rgb(255, 255, 255)"}
-    with open("./data/temp.json", "r") as f:
-        json_data: dict = json.load(f)
-        if room_code not in json_data.keys():
-            json_data[room_code] = pre_data
-            new_user = False
 
+    await sio.enter_room(sid, room_code)
+    with open("./data/temp.json", "rt") as f:
+        json_data: dict = json.load(f)
+    json_data[room_code]["players"].append(sid)
     with open("./data/temp.json", "w") as f:
         json.dump(json_data, f, indent=4)
-    await sio.enter_room(sid, room_code)
     await sio.emit("user_join", {"sid": sid}, skip_sid=sid)
 
 
@@ -100,7 +110,7 @@ async def recieve_data(sid: str, room_code: str, data: str):
     with open("./data/temp.json", "r") as f:
         json_data: dict = json.load(f)
 
-        json_data[room_code]["objects"].append(data)
+        json_data[room_code]["data"]["objects"].append(data)
 
     with open("./data/temp.json", "w") as f:
         json.dump(json_data, f, indent=4)
@@ -224,11 +234,12 @@ async def bg_change(sid: str, room_code: str, data: str):
     data : str
         _description_
     """
-    if room_code is not "":
+    if room_code != "":
         with open("./data/temp.json", "r") as f:
             json_data: dict = json.load(f)
 
             json_data[room_code]["background"] = data["bg_color_rgb"]
+            json_data[room_code]["data"]["background"] = data["bg_color_rgb"]
         with open("./data/temp.json", "w") as f:
             json.dump(json_data, f, indent=4)
         edited_data = {"sid": sid, "data": data}
@@ -246,7 +257,16 @@ async def disconnect(sid: str):
     sid : str
         The SID of the user who left the room.
     """
-
-    target_room = [room for room in sio.manager.get_rooms(sid, "/") if room != sid][0]
-    await sio.emit("user_leave", {"sid": sid}, room=target_room)
+    try:
+        target_room = [room for room in sio.manager.get_rooms(sid, "/") if room != sid][
+            0
+        ]
+        with open("./data/temp.json", "rt") as f:
+            json_data: dict = json.load(f)
+        json_data[target_room]["players"].remove(sid)
+        with open("./data/temp.json", "w") as f:
+            json.dump(json_data, f, indent=4)
+        await sio.emit("user_leave", {"sid": sid}, room=target_room)
+    except:
+        pass
     print(f"Disconnected '{sid}' from Webserver")

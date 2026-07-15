@@ -7,56 +7,45 @@
   import { Separator } from "$lib/components/ui/separator/index.js";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
+  import type { brushStateType, roomStateType } from "$lib/types";
 
   interface toolbarProps {
     brushState: brushStateType;
+    roomState: roomStateType;
   }
-  type brushStateType = {
-    strPaintBrush: "Spray" | "Pencil" | "Dotted" | "Circular"; //Default Brush
-    rgb: RgbaColor;
-    //color: colord(rgb),
-    bg_rgb: RgbaColor;
-    //bg_color: colord(bg_rgb),
-    brushWidth: number;
-  };
-  // let {
-  //   rgb = $bindable(),
-  //   color = $bindable(),
-  //   bg_color = $bindable(),
-  //   bg_rgb = $bindable(),
-  //   strPaintBrush = $bindable(),
-  //   brushWidth = $bindable(),
-  // }: toolbarProps = $props();
-  let { brushState }: toolbarProps = $props();
+
+  let { brushState, roomState }: toolbarProps = $props();
 
   let colorPickerOpen: boolean = $state(false);
   let bgPickerOpen: boolean = $state(false);
   let color: Colord = $derived(colord(brushState.rgb));
-  let bg_color: Colord = $derived(colord(brushState.bg_rgb));
+  let bg_color: Colord = $derived(colord(roomState.bg_rgb));
+  let bg_preview: Colord = $derived(colord({ ...roomState.bg_rgb }));
 </script>
 
 <div class="buttons flex flex-row gap-2.5 pt-1 pb-1">
   <!--BG Selection Button-->
-  <button
-    class="border-2 border-black p-1 rounded relative cursor-pointer"
-    style:background-color={bg_color.toRgbString()}
-    onclick={() => {
-      bgPickerOpen = !bgPickerOpen;
-    }}
-    title="Change Background Color"
-  >
-    <Wallpaper color={bg_color.invert().toRgbString()}></Wallpaper>
-
-    <div class="absolute top-0 left-0">
-      <ColorPicker
-        isOpen={bgPickerOpen}
-        label=""
-        --input-size="0px"
-        bind:rgb={brushState.bg_rgb}
-        bind:color={bg_color}
-      ></ColorPicker>
-    </div>
-  </button>
+  <div class="relative inline-block">
+    <button
+      class="border-2 border-black p-1 rounded cursor-pointer"
+      style:background-color={bg_preview.toRgbString()}
+      onclick={() => {
+        bgPickerOpen = !bgPickerOpen;
+      }}
+      title="Change Background Color"
+    >
+      <Wallpaper color={bg_preview.invert().toRgbString()}></Wallpaper>
+      <div class="absolute top-0 left-0 z-100 mt-2">
+        <ColorPicker
+          isOpen={bgPickerOpen}
+          label=""
+          --input-size="0px"
+          bind:rgb={roomState.bg_rgb}
+          bind:color={bg_color}
+        ></ColorPicker>
+      </div>
+    </button>
+  </div>
 
   <!--Brush selector-->
   <DropdownMenu.Root>
@@ -100,26 +89,32 @@
   </DropdownMenu.Root>
 
   <!--Color Selection Button-->
-  <button
-    class="border-2 border-black p-1 rounded relative cursor-pointer"
-    style:background-color={color.toRgbString()}
-    onclick={() => {
-      colorPickerOpen = !colorPickerOpen;
-    }}
-    title="Change Color"
-  >
-    <Pipette color={color.invert().toRgbString()}></Pipette>
+  <div class="relative inline-block">
+    <button
+      class="border-2 border-black p-1 rounded cursor-pointer"
+      style:background-color={color.toRgbString()}
+      onclick={() => {
+        colorPickerOpen = !colorPickerOpen;
+      }}
+      title="Change Color"
+    >
+      <Pipette color={color.invert().toRgbString()}></Pipette>
+      <div class="absolute top-0 left-0 z-100 mt-2">
+        <ColorPicker
+          isOpen={colorPickerOpen}
+          isDialog={true}
+          label=""
+          --input-size="0px"
+          bind:rgb={brushState.rgb}
+          bind:color
+        ></ColorPicker>
+      </div>
+    </button>
 
-    <div class="absolute top-0 left-0">
-      <ColorPicker
-        isOpen={colorPickerOpen}
-        label=""
-        --input-size="0px"
-        bind:rgb={brushState.rgb}
-        bind:color
-      ></ColorPicker>
-    </div>
-  </button>
+    <!-- {#if colorPickerOpen} -->
+
+    <!-- {/if} -->
+  </div>
 
   <!--Slider for Brush Width-->
   <div

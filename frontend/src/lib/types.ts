@@ -17,14 +17,14 @@ export type playerBrush = {
 };
 export type roomStateType = {
   room_code: string;
-  players: Array<playerData>;
-  playerBrushes: Array<playerBrush>;
+  players: Map<string, playerData>;
+  playerBrushes: Map<string, playerBrush>;
   ifMouseDown: boolean;
+  bg_rgb: RgbaColor;
+  lastUsedBg: string;
 };
 export type brushStateType = {
   strPaintBrush: "Spray" | "Pencil" | "Dotted" | "Circular"; //Default Brush
   rgb: RgbaColor;
-  bg_rgb: RgbaColor;
   brushWidth: number;
-  lastUsedBg: string;
 };
