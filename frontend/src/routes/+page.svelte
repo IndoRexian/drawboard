@@ -4,11 +4,15 @@
 
   import { Colord, colord } from "colord";
 
-  import { getCursorSVG, handleBrush } from "$lib/utils";
+  import { getCursorSVG } from "$lib/utils";
   import { io, Socket } from "socket.io-client";
   import { Toaster } from "svelte-sonner";
   import Toolbar from "$lib/components/Toolbar.svelte";
-  import { drawingController, lobbyController } from "$lib/socketControllers";
+  import {
+    cursorController,
+    drawingController,
+    lobbyController,
+  } from "$lib/socketControllers";
   import type {
     roomStateType,
     brushStateType,
@@ -16,11 +20,10 @@
     playerBrush,
   } from "$lib/types";
   import { canvasController } from "$lib/canvasControllers";
-
+  import * as ContextMenu from "$lib/components/ui/context-menu/index.js";
+  import { addMouseListener } from "$lib/mouseListener";
   let localCanvasElement: HTMLCanvasElement;
-  let baseCanvasElement: HTMLCanvasElement;
   let localCanvas: Canvas;
-  let baseCanvas: Canvas;
 
   let socket: Socket;
 
@@ -36,30 +39,30 @@
   let brushState: brushStateType = $state({
     strPaintBrush: "Pencil", //Default Brush
     rgb: { r: 0, g: 0, b: 0, a: 1 },
-    brushWidth: 1,
+    brushWidth: 3,
   });
-  let user_sid = $state("");
-  let canvasElements = $state(new Map<string, HTMLCanvasElement>());
-  let canvases = $state(new Map<string, Canvas>());
+  let user_sid = $state({ sid: "" });
   let color: Colord = $derived(colord(brushState.rgb));
   let bg_color: Colord = $derived(colord(roomState.bg_rgb));
   let syncState = $state({ bgHydrated: false });
   onMount(() => {
+    const canvasContainer = document.getElementById("canvas-container");
+    const initialWidth = canvasContainer?.clientWidth ?? 600;
+    const initialHeight = canvasContainer?.clientHeight ?? 600;
+
     localCanvas = new Canvas(localCanvasElement, {
-      width: 600,
-      height: 600,
+      width: window.innerWidth,
+      height: window.innerHeight,
       backgroundColor: "transparent",
-      freeDrawingCursor: getCursorSVG(
-        colord(brushState.rgb).toRgbString(),
+      // defaultCursor: "cell",
+      defaultCursor: getCursorSVG(
+        color.toRgbString(),
+        color.invert().toRgbString(),
         brushState.brushWidth,
       ),
-      isDrawingMode: true,
-    });
-    baseCanvas = new Canvas(baseCanvasElement, {
-      width: 600,
-      height: 600,
-      backgroundColor: bg_color.toRgbString(),
       isDrawingMode: false,
+      fireRightClick: false,
+      stopContextMenu: false,
     });
     const positionCanvas = (
       targetCanvas: Canvas,
@@ -82,13 +85,13 @@
       }
     };
 
-    positionCanvas(localCanvas, 50, true);
-    positionCanvas(baseCanvas, 0, false);
+    // positionCanvas(localCanvas, 50, true);
 
     socket = io("/", {
       transports: ["websocket", "webtransport", "polling"],
       rejectUnauthorized: false,
     });
+    addMouseListener(canvasContainer!, socket!, roomState);
   });
 
   $effect(() => {
@@ -96,25 +99,17 @@
       socket,
       roomState,
       brushState,
-      baseCanvas,
-      canvases,
-      canvasElements,
+      localCanvas,
       user_sid,
       syncState,
     );
-    drawingController(
-      socket,
-      localCanvas,
-      roomState,
-      brushState,
-      baseCanvas,
-      canvases,
-      canvasElements,
-      syncState,
-    );
+    drawingController(socket, localCanvas, roomState, brushState, syncState);
 
     if (!localCanvas) return;
     canvasController(localCanvas, socket, roomState, brushState);
+
+    //Haven't fixed all of it's bugs yet!
+    // cursorController(socket, roomState);
 
     return () => socket.disconnect();
   });
@@ -126,30 +121,30 @@
         brushWidth: brushState.brushWidth,
       });
     }
-    handleBrush(
-      localCanvas,
-      brushState.strPaintBrush,
-      brushState.brushWidth,
-      color,
-    );
 
-    if (!localCanvas || !localCanvas.freeDrawingBrush) return;
+    //commented until i find a good cursor
+    if (localCanvas) {
+      localCanvas.defaultCursor = getCursorSVG(
+        colord(brushState.rgb).toRgbString(),
+        colord(brushState.rgb).invert().toRgbString(),
+        brushState.brushWidth,
+      );
+    }
+
     localCanvas.requestRenderAll();
   });
   $effect(() => {
-    if (!localCanvas || !socket || !baseCanvas) return;
-
+    if (!localCanvas || !socket) return;
     const currentBg = bg_color.toRgbString();
-    baseCanvas.backgroundColor = currentBg;
-    baseCanvas.requestRenderAll();
-
+    localCanvas.backgroundColor = currentBg;
+    localCanvas.requestRenderAll();
     if (
       !syncState.bgHydrated ||
       !roomState.room_code ||
       currentBg === roomState.lastUsedBg
     )
       return;
-
+    console.log(brushState.brushWidth);
     roomState.lastUsedBg = currentBg;
     socket.emit("draw:bg_change", roomState.room_code, {
       bg_color: bg_color.rgba,
@@ -160,29 +155,35 @@
   //         so gotta wrap JS elements into HTML ones like canvasElement onto canvas
 </script>
 
-<div class="grid justify-center animate-in ease-in">
+<div class="grid w-full animate-in ease-in">
   <Toaster />
   <div class="flex flex-fill text-2xl justify-center mb-1">Drawboard</div>
-  <div>{user_sid}</div>
-  <div class="flex flex-row min-w-max">
-    <div class="basis-3/4">
-      <div class="relative w-150 h-150" id="canvas-container">
-        <canvas
-          bind:this={localCanvasElement}
-          class="local-canvas border-2 border-black"
-
-          // style="position: absolute; top:0; left:0;"
-        ></canvas>
-        <canvas
-          bind:this={baseCanvasElement}
-          class="base-canvas border-2 border-black"
-        ></canvas>
-      </div>
-      <Toolbar {brushState} {roomState}></Toolbar>
+  <div class="flex w-full h-full flex-row min-w-0 min-h-0">
+    <div class="flex-1 min-w-0">
+      <ContextMenu.Root>
+        <ContextMenu.Trigger>
+          <div
+            class="relative h-full min-h-0 w-full min-w-0"
+            id="canvas-container"
+          >
+            <div
+              class="absolute inset-0 z-10 min-w-full min-h-full pointer-events-none"
+              id="cursors"
+            ></div>
+            <canvas
+              bind:this={localCanvasElement}
+              class="local-canvas block w-full h-full border-2 border-black"
+            ></canvas>
+          </div>
+        </ContextMenu.Trigger>
+        <ContextMenu.Content>
+          <Toolbar {brushState} {roomState}></Toolbar>
+        </ContextMenu.Content>
+      </ContextMenu.Root>
     </div>
-    <div class=" basis-1/4">
+    <!-- <div class=" basis-1/4">
       <div class="users min-w-max"></div>
-    </div>
+    </div> -->
   </div>
 </div>
 

@@ -1,27 +1,31 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { Canvas, PencilBrush, CircleBrush, SprayBrush } from "fabric";
+import { Canvas, PencilBrush, CircleBrush, SprayBrush, Path } from "fabric";
 import { SprayPaintBrush } from "$lib/canvas";
 import { type Colord } from "colord";
+import type { cursorData, playerData } from "./types";
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function getCursorSVG(fill: string, size: number) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" id="circleSVG" width="24" height="24" viewBox="0 0 24 24" fill="none"
-    stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-    class="lucide lucide-circle-icon lucide-circle">
-    <circle id="circle" cx="12" cy="12" r="10" fill="black" />
+export function getCursorSVG(fill: string, invertFill: string, size: number) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"
+    fill="white" viewBox="2 2 20 20" id="cursorSVG">
+    <!--Boxicons
+    v3.0.8 https://boxicons.com | License  https://docs.boxicons.com/free-->
+    <path
+        d="m21,8h-5V3c0-.55-.45-1-1-1h-6c-.55,0-1,.45-1,1v5H3c-.55,0-1,.45-1,1v6c0,.55.45,1,1,1h5v5c0,.55.45,1,1,1h6c.55,0,1-.45,1-1v-5h5c.55,0,1-.45,1-1v-6c0-.55-.45-1-1-1Z" />
 </svg>`;
   const parser = new DOMParser();
   const svgDoc = parser.parseFromString(svg, "image/svg+xml");
 
-  const svgEl = svgDoc.getElementById("circleSVG");
-  svgDoc.getElementById("circle")?.setAttribute("fill", fill);
+  const svgEl = svgDoc.getElementById("cursorSVG");
+
   svgEl?.setAttribute("fill", fill);
-  svgEl?.setAttribute("stroke", fill);
-  svgEl?.setAttribute("width", size.toString());
-  svgEl?.setAttribute("height", size.toString());
+  // svgEl?.setAttribute("stroke", invertFill);
+  // svgEl?.setAttribute("width", size.toString());
+  // svgEl?.setAttribute("height", size.toString());
   //svgEl?.setAttribute("viewBox", `0 0 ${size} ${size}`);
   const hotspot = Math.round(size / 2);
 
@@ -33,12 +37,6 @@ export function getCursorSVG(fill: string, size: number) {
   // Use encodeURIComponent to safely escape any special characters (#, <, >) in the SVG code
   return `url("data:image/svg+xml;utf8,${encodeURIComponent(svgString)}") ${hotspot} ${hotspot}, auto`;
 }
-type playerData = {
-  sid: string;
-  brushType: "Spray" | "Pencil" | "Dotted" | "Circular";
-  brushWidth: number;
-  brushColor: Colord;
-};
 
 export function initBrush(canvas: Canvas, data: playerData) {
   let brush: SprayPaintBrush | PencilBrush | SprayBrush | CircleBrush;
@@ -74,89 +72,42 @@ export function handleBrush(
     | SprayBrush
     | CircleBrush;
   if (!canvas) return;
-  if (brushType == "Spray") {
-    currentPaintBrush = new SprayPaintBrush(canvas);
-    currentPaintBrush.loadBrush().then(() => {
-      (currentPaintBrush as SprayPaintBrush).setColor(color.toHex());
-      canvas.freeDrawingBrush = currentPaintBrush;
-      // canvas.freeDrawingBrush.width = brushWidth;
-    });
-    // console.log("Spray");
-  } else {
-    if (brushType == "Circular") {
-      currentPaintBrush = new CircleBrush(canvas);
-      canvas.freeDrawingBrush = currentPaintBrush;
-      // canvas.freeDrawingBrush.width = brushWidth;
-      // console.log("Circle");
-    } else if (brushType == "Dotted") {
-      currentPaintBrush = new SprayBrush(canvas);
-      canvas.freeDrawingBrush = currentPaintBrush;
-      // canvas.freeDrawingBrush.width = brushWidth;
-      // console.log("Dotted");
-    } else if (brushType == "Pencil") {
-      currentPaintBrush = new PencilBrush(canvas);
-      currentPaintBrush.decimate = 2.5;
-      canvas.freeDrawingBrush = currentPaintBrush;
+  // if (brushType == "Spray") {
+  //   currentPaintBrush = new SprayPaintBrush(canvas);
+  //   currentPaintBrush.loadBrush().then(() => {
+  //     (currentPaintBrush as SprayPaintBrush).setColor(color.toHex());
+  //     canvas.freeDrawingBrush = currentPaintBrush;
+  //     // canvas.freeDrawingBrush.width = brushWidth;
+  //   });
+  //   // console.log("Spray");
+  // } else {
+  //   if (brushType == "Circular") {
+  //     currentPaintBrush = new CircleBrush(canvas);
+  //     canvas.freeDrawingBrush = currentPaintBrush;
+  //     // canvas.freeDrawingBrush.width = brushWidth;
+  //     // console.log("Circle");
+  //   } else if (brushType == "Dotted") {
+  //     currentPaintBrush = new SprayBrush(canvas);
+  //     canvas.freeDrawingBrush = currentPaintBrush;
+  //     // canvas.freeDrawingBrush.width = brushWidth;
+  //     // console.log("Dotted");
+  //   } else if (brushType == "Pencil") {
+  //     currentPaintBrush = new PencilBrush(canvas);
+  //     currentPaintBrush.decimate = 2.5;
+  //     canvas.freeDrawingBrush = currentPaintBrush;
 
-      // canvas.freeDrawingBrush.width = brushWidth;
-      // console.log("Pencil");
-    }
-  }
+  //     // canvas.freeDrawingBrush.width = brushWidth;
+  //     // console.log("Pencil");
+  //   }
+  // }
   canvas.freeDrawingBrush!.color = color.toRgbString();
   canvas.freeDrawingBrush!.width = brushWidth;
   //canvas.freeDrawingBrush
-  canvas.freeDrawingCursor = getCursorSVG(color.toRgbString(), brushWidth);
-}
-
-export function createCanvas(
-  canvases: Map<string, Canvas>,
-  canvasElements: Map<string, HTMLCanvasElement>,
-  index: number,
-  sid: string,
-) {
-  const positionCanvas = (
-    targetCanvas: Canvas,
-    zIndex: number,
-    transparency: boolean,
-  ) => {
-    const wrapper = targetCanvas.wrapperEl;
-
-    wrapper.style.position = "absolute";
-    wrapper.style.top = "0";
-    wrapper.style.left = "0";
-    wrapper.style.zIndex = String(zIndex);
-
-    const canvasElement = targetCanvas.getElement();
-    if (canvasElement && transparency) {
-      wrapper.style.backgroundColor = "transparent";
-      canvasElement.style.backgroundColor = "transparent";
-      canvasElement.style.background = "transparent";
-      targetCanvas.backgroundColor = "rgba(0,0,0,0)";
-    }
-  };
-  const container = document.getElementById("canvas-container");
-  const canvasElement = document.createElement("canvas");
-  canvasElement.id = sid;
-  container?.append(canvasElement);
-  const canvas = new Canvas(canvasElement, {
-    width: 600,
-    height: 600,
-    isDrawingMode: false,
-  });
-  positionCanvas(canvas, index, true);
-  canvases.set(sid, canvas);
-  canvasElements.set(sid, canvasElement);
-}
-
-export function removeCanvas(
-  canvases: Map<string, Canvas>,
-  canvasElements: Map<string, HTMLCanvasElement>,
-  sid: string,
-) {
-  canvasElements.get(sid)?.remove();
-  canvasElements.delete(sid);
-  canvases.get(sid)?.dispose();
-  canvases.delete(sid);
+  canvas.freeDrawingCursor = getCursorSVG(
+    color.toRgbString(),
+    color.invert().toRgbString(),
+    brushWidth,
+  );
 }
 
 export function checkMobile() {
@@ -176,6 +127,82 @@ export function checkMobile() {
   })(navigator.userAgent || navigator.vendor);
 }
 
+type Point = [number, number];
+export class DrawStroke {
+  canvas: Canvas;
+  private avg;
+  private range;
+  constructor(canvas: Canvas) {
+    this.canvas = canvas;
+
+    const avg = ([ax, ay]: Point, [bx, by]: Point): Point => [
+      (ax + bx) / 2,
+      (ay + by) / 2,
+    ];
+
+    const range = (start: number, end: number) =>
+      Array.from({ length: end - start }, (_, i) => start + i);
+
+    this.avg = avg;
+    this.range = range;
+  }
+
+  drawPreviewStroke(svgData: string, color: string) {
+    const ctx = this.canvas.contextTop;
+    ctx.save();
+    ctx.clearRect(0, 0, this.canvas.getWidth(), this.canvas.getHeight());
+    ctx.fillStyle = color;
+    ctx.fill(new Path2D(svgData));
+    ctx.restore();
+  }
+
+  clearPreviewStroke() {
+    this.canvas.contextTop.clearRect(
+      0,
+      0,
+      this.canvas.getWidth(),
+      this.canvas.getHeight(),
+    );
+  }
+
+  commitStroke(svgData: string, color: string) {
+    this.clearPreviewStroke();
+
+    const path = new Path(svgData);
+    path.set({
+      fill: color,
+      strokeWidth: 0,
+      selectable: false,
+      evented: false,
+      objectCaching: false,
+    });
+
+    this.canvas.add(path);
+    this.canvas.requestRenderAll();
+
+    return path;
+  }
+  getSvgPathFromStroke(stroke: Point[], closed = true) {
+    if (stroke.length < 4) return "";
+    return [
+      "M",
+      stroke[0],
+      "Q",
+      stroke[1],
+      this.avg(stroke[1], stroke[2]),
+      "T",
+      ...this.range(2, stroke.length - 1).map((i) =>
+        this.avg(stroke[i], stroke[i + 1]),
+      ),
+      closed ? "Z" : "",
+    ]
+      .flat()
+      .map((v) => (typeof v === "number" ? v.toFixed(2) : v))
+      .filter(Boolean)
+      .join(" ");
+  }
+}
+
 export async function loadCanvas(canvas: Canvas, data: any) {
   await canvas.loadFromJSON(data, () => {
     console.log("loaded");
@@ -184,6 +211,33 @@ export async function loadCanvas(canvas: Canvas, data: any) {
   console.log("done");
 }
 
+export function createCursor(sid: string, playerData: Map<string, playerData>) {
+  const container = document.getElementById("cursors");
+  const element = document.createElement("img");
+  element.src = "/cursor.svg";
+  element.style = `position:absolute left:${playerData.get(sid)?.cursor.x} top:${playerData.get(sid)?.cursor.y} hidden:${playerData.get(sid)?.cursor.idle}`;
+  element.className += sid;
+  element.alt = "cursor";
+  container?.append(element);
+}
+
+export function deleteCursor(sid: string) {
+  const element = document
+    .getElementById("cursors")
+    ?.getElementsByClassName(sid)[0];
+  element?.remove();
+}
+export function changeCursorLoc(
+  sid: string,
+  playerData: Map<string, playerData>,
+  cursorData: cursorData,
+) {
+  const element = <HTMLElement>(
+    document.getElementById("cursors")?.getElementsByClassName(sid)[0]
+  );
+  element!.style.left = `${cursorData.x}px`;
+  element!.style.top = `${cursorData.y}px`;
+}
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type WithoutChild<T> = T extends { child?: any } ? Omit<T, "child"> : T;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

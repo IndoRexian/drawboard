@@ -1,8 +1,14 @@
 import { goto } from "$app/navigation";
 import { Socket } from "socket.io-client";
 import { colord } from "colord";
-import { createCanvas, initBrush } from "./utils";
-import { Canvas, Point, type TBrushEventData } from "fabric";
+import {
+  changeCursorLoc,
+  createCursor,
+  deleteCursor,
+  DrawStroke,
+  initBrush,
+} from "./utils";
+import { Canvas, Point } from "fabric";
 import { toast } from "svelte-sonner";
 import { CircleUserRound, LogOut } from "@lucide/svelte";
 import type {
@@ -10,20 +16,20 @@ import type {
   playerBrush,
   roomStateType,
   brushStateType,
+  cursorData,
 } from "$lib/types";
 
 export function lobbyController(
   socket: Socket,
   roomState: roomStateType,
   brushState: brushStateType,
-  baseCanvas: Canvas,
-  canvases: Map<string, Canvas>,
-  canvasElements: Map<string, HTMLCanvasElement>,
-  user_sid: string,
+  localCanvas: Canvas,
+  user_sid: any,
   syncState: { bgHydrated: boolean },
 ) {
   const url = new URL(window.location.toString());
 
+  //event handler for when the player connects(local event)
   socket.on("connect", () => {
     if (url.searchParams.get("room_code") == null) {
       //Creator of room
@@ -31,37 +37,31 @@ export function lobbyController(
     } else {
       roomState.room_code = url.searchParams.get("room_code")!;
       socket.emit("join_room", roomState.room_code);
-      //this is for each player who joined before this particular user
-      roomState.players.forEach((value, sid) => {
-        createCanvas(
-          canvases,
-          canvasElements,
-          Array.from(roomState.players.keys()).indexOf(sid) + 2,
-          value.sid,
-        );
-      });
     }
     socket.emit("send_data", roomState.room_code);
   });
 
+  //event handler for when the user gets the room code from the server
   socket.on("send_roomcode", (data) => {
     //getting room_code
     roomState.room_code = data["room_code"];
     console.log(roomState.room_code);
     goto(`/?room_code=${roomState.room_code}`);
-    user_sid = data.sid;
+    user_sid.sid = data.sid;
+    console.log(data.sid);
   });
 
+  //event handler for when the user gets some canvas data from the server
   socket.on("get_data", (data) => {
-    baseCanvas.loadFromJSON(data["data"], () => {});
+    localCanvas.loadFromJSON(data["data"], () => {});
     const backgroundColor = colord(
-      (baseCanvas.backgroundColor ?? "rgb(255,255,255)") as string,
+      (localCanvas.backgroundColor ?? "rgb(255,255,255)") as string,
     );
     roomState.bg_rgb = backgroundColor.rgba;
     roomState.lastUsedBg = backgroundColor.toRgbString();
     syncState.bgHydrated = true;
-    baseCanvas.requestRenderAll();
-    console.log("data: ", roomState.players);
+    localCanvas.requestRenderAll();
+
     //this is creation/propagation of players and playerBrushes
     for (let index = 0; index < data["players"].length; index++) {
       const sid = data["players"][index];
@@ -70,31 +70,42 @@ export function lobbyController(
         brushType: "Pencil",
         brushWidth: 3,
         brushColor: colord({ r: 0, g: 0, b: 0, a: 1 }),
+        cursor: { idle: true, x: 0, y: 0 },
       };
       const playerBrush: playerBrush = {
         sid: sid,
-        brush: initBrush(canvases.get(data["sid"])!, player),
+        brush: initBrush(localCanvas, player),
       };
       roomState.players.set(sid, player);
-
-      createCanvas(canvases, canvasElements, roomState.players.size + 2, sid);
       roomState.playerBrushes.set(sid, playerBrush);
+
+      // createCursor(sid, roomState.players);
     }
   });
 
+  //event handler for when a user joins(remote event)
   socket.on("user_join", (data) => {
+    //setting player data
     const player: playerData = {
       sid: data["sid"],
       brushType: "Pencil",
       brushWidth: 3,
       brushColor: colord({ r: 0, g: 0, b: 0, a: 1 }),
+      cursor: { idle: true, x: 0, y: 0 },
     };
     roomState.players.set(data["sid"], player);
+
+    //setting player brush
     const playerBrush: playerBrush = {
       sid: data["sid"],
-      brush: initBrush(canvases.get(data["sid"])!, player),
+      brush: initBrush(localCanvas, player),
     };
     roomState.playerBrushes.set(data["sid"], playerBrush);
+
+    //creating cursor div
+    // createCursor(data["sid"], roomState.players);
+
+    //join toast
     toast("New User Joined", {
       classes: {
         toast: "!border-2 !border-green-500",
@@ -103,12 +114,7 @@ export function lobbyController(
       icon: CircleUserRound,
       position: "top-right",
     });
-    createCanvas(
-      canvases,
-      canvasElements,
-      roomState.players.size + 2,
-      data["sid"],
-    );
+
     //this is basically the current users sending their brush configs to the new user
     socket.emit("draw:brush_change", roomState.room_code, {
       brushType: brushState.strPaintBrush,
@@ -117,10 +123,14 @@ export function lobbyController(
     });
   });
 
+  //event handler for when user leaves
   socket.on("user_leave", (data) => {
-    console.log("LEFT");
     roomState.players.delete(data["sid"]);
-    // removeCanvas(canvases, canvasElements, data.sid);
+
+    //delete cursor div for that user
+    deleteCursor(data["sid"]);
+
+    //leave toast
     toast("User Left!", {
       classes: {
         toast: "!border-2 !border-red-500",
@@ -137,39 +147,42 @@ export function drawingController(
   localCanvas: Canvas,
   roomState: roomStateType,
   brushState: brushStateType,
-  baseCanvas: Canvas,
-  canvases: Map<string, Canvas>,
-  canvasElements: Map<string, HTMLCanvasElement>,
   syncState: { bgHydrated: boolean },
 ) {
+  const strokeDrawer = new DrawStroke(localCanvas);
+
   socket.on("draw:started", (data) => {
+    //mouse down event
     const newPoint = new Point();
     newPoint.setXY(data.data.x, data.data.y);
     const brush = roomState.playerBrushes.get(data["sid"])?.brush;
 
-    console.log(brush);
-    brush?.onMouseDown(newPoint, {
-      e: {},
-    } as TBrushEventData);
-    baseCanvas.requestRenderAll();
+    strokeDrawer.drawPreviewStroke(data.data.svgData, data.data.color);
+    // brush?.onMouseDown(newPoint, {
+    //   e: {},
+    // } as TBrushEventData);
+    // baseCanvas.requestRenderAll();
   });
 
   socket.on("draw:conted", (data) => {
+    //mouse move event
     const newPoint = new Point();
     newPoint.setXY(data.data.x, data.data.y);
     const brush = roomState.playerBrushes.get(data["sid"])?.brush;
-    brush?.onMouseMove(newPoint, {
-      e: {},
-    } as TBrushEventData);
+    strokeDrawer.drawPreviewStroke(data.data.svgData, data.data.color);
+    // brush?.onMouseMove(newPoint, {
+    //   e: {},
+    // } as TBrushEventData);
 
-    baseCanvas.requestRenderAll();
+    // baseCanvas.requestRenderAll();
   });
 
   socket.on("draw:ended", (data) => {
     const brush = roomState.playerBrushes.get(data["sid"])?.brush;
-    brush?.onMouseUp({
-      e: {},
-    } as TBrushEventData);
+    strokeDrawer.commitStroke(data.data.svgData, data.data.color);
+    // brush?.onMouseUp({
+    //   e: {},
+    // } as TBrushEventData);
     localCanvas.fire("objectAdded:recieved");
   });
 
@@ -179,11 +192,12 @@ export function drawingController(
       brushType: data.data.brushType,
       brushColor: colord(data.data.brushColor),
       brushWidth: data.data.brushWidth,
+      cursor: { idle: true, x: 0, y: 0 },
     };
 
     const playerBrush: playerBrush = {
       sid: data.sid,
-      brush: initBrush(canvases.get(data.sid)!, player),
+      brush: initBrush(localCanvas, player),
     };
     roomState.players.set(data.sid, player);
     roomState.playerBrushes.set(data.sid, playerBrush);
@@ -193,9 +207,25 @@ export function drawingController(
     const bg_color = colord(data.data.bg_color);
     if (bg_color.toRgbString() === roomState.lastUsedBg) return; //js to make sure changing bg doesnt loop
     roomState.lastUsedBg = bg_color.toRgbString(); //already comes as rgb string
-    baseCanvas.backgroundColor = bg_color.toRgbString();
+    localCanvas.backgroundColor = bg_color.toRgbString();
     roomState.bg_rgb = bg_color.rgba;
     syncState.bgHydrated = true;
-    baseCanvas.requestRenderAll();
+    localCanvas.requestRenderAll();
+  });
+}
+
+export function cursorController(socket: Socket, roomState: roomStateType) {
+  socket.on(
+    "mouse:locationed",
+    (data: { sid: string; x: number; y: number }) => {
+      const cursor: cursorData = { x: data.x, y: data.y, idle: false };
+
+      changeCursorLoc(data.sid, roomState.players, cursor);
+    },
+  );
+
+  socket.on("mouse:idled", (data: { sid: string }) => {
+    const player = roomState.players.get(data.sid);
+    player!.cursor.idle = true;
   });
 }

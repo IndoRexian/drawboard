@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"
+    fill="white" viewBox="2 2 20 20" stroke="red">
+    <!--Boxicons
+    v3.0.8 https://boxicons.com | License  https://docs.boxicons.com/free-->
+    <path
+        d="m21,8h-5V3c0-.55-.45-1-1-1h-6c-.55,0-1,.45-1,1v5H3c-.55,0-1,.45-1,1v6c0,.55.45,1,1,1h5v5c0,.55.45,1,1,1h6c.55,0,1-.45,1-1v-5h5c.55,0,1-.45,1-1v-6c0-.55-.45-1-1-1Z" />
+</svg>
