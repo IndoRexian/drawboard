@@ -15,6 +15,7 @@ origins = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
     "https://francesca-overpopulous-nonbrutally.ngrok-free.dev",
+    "https://drawboard.indorexian.me",
 ]
 
 app.add_middleware(
