@@ -21,6 +21,7 @@ export type canvasMouseData = {
 
 export type playerData = {
   sid: string;
+  local: boolean;
   brushType: "Spray" | "Pencil" | "Dotted" | "Circular";
   brushWidth: number;
   brushColor: Colord;

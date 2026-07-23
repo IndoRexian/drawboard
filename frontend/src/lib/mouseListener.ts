@@ -10,19 +10,21 @@ export function addMouseListener(
   let rafPending = false;
   let x = 0;
   let y = 0;
+  const rect = canvasContainer.getBoundingClientRect();
   const setIdle = () => {
     console.log("idle");
     socket.emit("mouse:idle", roomState.room_code);
   };
 
   const onMouseMove = (e: MouseEvent) => {
-    x = e.offsetX;
-    y = e.offsetY;
+    x = e.clientX-rect.left;
+    y = e.clientY-rect.top;
     clearTimeout(idleTimer);
     idleTimer = setTimeout(setIdle, 10000);
     if (rafPending) return;
     rafPending = true;
     requestAnimationFrame(() => {
+      
       socket.emit("mouse:location", roomState.room_code, { x: x, y: y });
 
       rafPending = false;

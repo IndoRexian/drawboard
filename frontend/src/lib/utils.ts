@@ -211,20 +211,64 @@ export async function loadCanvas(canvas: Canvas, data: any) {
   console.log("done");
 }
 
+const pendingCursorPositions = new Map<
+  string,
+  {
+    x: number;
+    y: number;
+    frameId: number | null;
+  }
+>();
+
+const CURSOR_HOTSPOT = 6;
+
 export function createCursor(sid: string, playerData: Map<string, playerData>) {
+  const player = playerData.get(sid);
+
   const container = document.getElementById("cursors");
+  const existing = container?.getElementsByClassName(sid + "cursor")[0];
+  existing?.remove();
+
+  const cursorWrapper = document.createElement("div");
+  cursorWrapper.className = sid + "cursor";
+  cursorWrapper.style.position = "absolute";
+  cursorWrapper.style.left = "0px";
+  cursorWrapper.style.top = "0px";
+  cursorWrapper.style.translate = `${(player?.cursor.x ?? 0) - CURSOR_HOTSPOT}px ${(player?.cursor.y ?? 0) - CURSOR_HOTSPOT}px`;
+  cursorWrapper.style.display = "block";
+  cursorWrapper.style.flexDirection = "column";
+  cursorWrapper.style.alignItems = "center";
+  cursorWrapper.style.pointerEvents = "none";
+  cursorWrapper.hidden = player?.cursor.idle ?? false;
+
   const element = document.createElement("img");
   element.src = "/cursor.svg";
-  element.style = `position:absolute left:${playerData.get(sid)?.cursor.x} top:${playerData.get(sid)?.cursor.y} hidden:${playerData.get(sid)?.cursor.idle}`;
-  element.className += sid;
+element.style.top = "0";
+element.style.left = "0";
   element.alt = "cursor";
-  container?.append(element);
+  //element.style.width = "20px";
+  //element.style.height = "20px";
+
+  const label = document.createElement("div");
+  label.textContent = sid;
+ label.style.top = "20px";label.style.left = "12px";
+  label.style.padding = "2px 6px";
+  label.style.borderRadius = "999px";
+  label.style.position="absolute"
+  label.style.background = "rgba(0, 0, 0, 0.72)";
+  label.style.color = "#fff";
+  label.style.fontSize = "12px";
+  label.style.lineHeight = "1";
+  label.style.whiteSpace = "nowrap";
+
+  cursorWrapper.append(element, label);
+  container?.append(cursorWrapper);
 }
 
 export function deleteCursor(sid: string) {
   const element = document
     .getElementById("cursors")
-    ?.getElementsByClassName(sid)[0];
+    ?.getElementsByClassName(sid + "cursor")[0];
   element?.remove();
 }
 export function changeCursorLoc(
@@ -232,12 +276,39 @@ export function changeCursorLoc(
   playerData: Map<string, playerData>,
   cursorData: cursorData,
 ) {
-  const element = <HTMLElement>(
-    document.getElementById("cursors")?.getElementsByClassName(sid)[0]
-  );
-  element!.style.left = `${cursorData.x}px`;
-  element!.style.top = `${cursorData.y}px`;
+  const element = document
+    .getElementById("cursors")
+    ?.getElementsByClassName(sid + "cursor")[0] as HTMLElement | undefined;
+  if (!element) return;
+
+  let pending = pendingCursorPositions.get(sid);
+  if (!pending) {
+    pending = { x: cursorData.x, y: cursorData.y, frameId: null };
+    pendingCursorPositions.set(sid, pending);
+  } else {
+    pending.x = cursorData.x;
+    pending.y = cursorData.y;
+  }
+
+  if (pending.frameId !== null) return;
+
+  pending.frameId = requestAnimationFrame(() => {
+    const latest = pendingCursorPositions.get(sid);
+    if (!latest) return;
+    element.hidden = false;
+    element.style.translate = `${latest.x}px ${latest.y}px`;
+    latest.frameId = null;
+  });
 }
+export function hideCursor(sid: string, playerData: Map<string, playerData>) {
+  playerData.get(sid)!.cursor.idle=true;
+  const element = document
+    .getElementById("cursors")
+    ?.getElementsByClassName(sid)[0] as HTMLElement | undefined;
+  if (!element) return;
+  element.hidden = true;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type WithoutChild<T> = T extends { child?: any } ? Omit<T, "child"> : T;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

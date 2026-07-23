@@ -5,6 +5,7 @@ from socketio import AsyncServer
 
 
 def register_handlers(sio: AsyncServer):
+
     room = RoomHandler(sio)
     canvas = CanvasHandler(sio)
     mouse = MouseHandler(sio)

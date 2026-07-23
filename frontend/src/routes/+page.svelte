@@ -47,12 +47,12 @@
   let syncState = $state({ bgHydrated: false });
   onMount(() => {
     const canvasContainer = document.getElementById("canvas-container");
-    const initialWidth = canvasContainer?.clientWidth ?? 600;
-    const initialHeight = canvasContainer?.clientHeight ?? 600;
+    const CANVAS_WIDTH = 1920;
+    const CANVAS_HEIGHT = 1080;
 
     localCanvas = new Canvas(localCanvasElement, {
-      width: window.innerWidth,
-      height: window.innerHeight,
+      width: window.outerWidth,
+      height: window.outerHeight,
       backgroundColor: "transparent",
       // defaultCursor: "cell",
       defaultCursor: getCursorSVG(
@@ -62,28 +62,10 @@
       ),
       isDrawingMode: false,
       fireRightClick: false,
+      fireMiddleClick: false,
       stopContextMenu: false,
+      selection: false,
     });
-    const positionCanvas = (
-      targetCanvas: Canvas,
-      zIndex: number,
-      transparency: boolean,
-    ) => {
-      const wrapper = targetCanvas.wrapperEl;
-
-      wrapper.style.position = "absolute";
-      wrapper.style.top = "0";
-      wrapper.style.left = "0";
-      wrapper.style.zIndex = String(zIndex);
-
-      const canvasElement = targetCanvas.getElement();
-      if (canvasElement && transparency) {
-        wrapper.style.backgroundColor = "transparent";
-        canvasElement.style.backgroundColor = "transparent";
-        canvasElement.style.background = "transparent";
-        targetCanvas.backgroundColor = "rgba(0,0,0,0)";
-      }
-    };
 
     // positionCanvas(localCanvas, 50, true);
 
@@ -103,13 +85,20 @@
       user_sid,
       syncState,
     );
-    drawingController(socket, localCanvas, roomState, brushState, syncState);
+    drawingController(
+      socket,
+      localCanvas,
+      roomState,
+      brushState,
+      user_sid,
+      syncState,
+    );
 
     if (!localCanvas) return;
     canvasController(localCanvas, socket, roomState, brushState);
 
     //Haven't fixed all of it's bugs yet!
-    // cursorController(socket, roomState);
+    cursorController(socket, roomState);
 
     return () => socket.disconnect();
   });
@@ -144,7 +133,7 @@
       currentBg === roomState.lastUsedBg
     )
       return;
-    console.log(brushState.brushWidth);
+    console.log(roomState.players);
     roomState.lastUsedBg = currentBg;
     socket.emit("draw:bg_change", roomState.room_code, {
       bg_color: bg_color.rgba,
@@ -157,7 +146,9 @@
 
 <div class="grid w-full animate-in ease-in">
   <Toaster />
-  <div class="flex flex-fill text-2xl justify-center mb-1">Drawboard</div>
+  <div class="flex flex-fill text-2xl justify-center mb-1">
+    Drawboard: {user_sid.sid}
+  </div>
   <div class="flex w-full h-full flex-row min-w-0 min-h-0">
     <div class="flex-1 min-w-0">
       <ContextMenu.Root>

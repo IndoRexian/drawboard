@@ -71,6 +71,7 @@ class RoomHandler:
         await self.sio.emit("user_join", {"sid": sid}, skip_sid=sid)
 
     async def send_data(self, sid: str, room_code: str):
+
         with open("./data/temp.json", "rt") as f:
             json_data: dict = json.load(f)
         await self.sio.emit("get_data", json_data[room_code], room=room_code)
